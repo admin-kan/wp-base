@@ -2,6 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+[ -f .env ] || { echo "ERROR: .env not found"; exit 1; }
+set -a
+. ./.env
+set +a
+
 echo "Checking Docker Compose..."
 docker compose config >/dev/null
 
@@ -24,21 +29,25 @@ echo "Checking WP-CLI..."
 docker compose exec -T wordpress wp --allow-root cli version >/dev/null
 
 echo "Checking WordPress core..."
-core_version="$(docker compose exec -T wordpress wp --allow-root core version | tr -d '')"
+core_version="$(docker compose exec -T wordpress wp --allow-root core version | tr -d '
+')"
 [ "$core_version" = "7.1.2" ] || { echo "ERROR: expected WordPress 7.1.2, got $core_version"; exit 1; }
 
 docker compose exec -T wordpress wp --allow-root core is-installed >/dev/null
 
 echo "Checking Astra..."
-astra_version="$(docker compose exec -T wordpress wp --allow-root theme get astra --field=version | tr -d '')"
+astra_version="$(docker compose exec -T wordpress wp --allow-root theme get astra --field=version | tr -d '
+')"
 [ "$astra_version" = "4.14.0" ] || { echo "ERROR: expected Astra 4.14.0, got $astra_version"; exit 1; }
 
 echo "Checking Google Authenticator..."
-ga_version="$(docker compose exec -T wordpress wp --allow-root plugin get google-authenticator --field=version | tr -d '')"
+ga_version="$(docker compose exec -T wordpress wp --allow-root plugin get google-authenticator --field=version | tr -d '
+')"
 [ "$ga_version" = "0.56" ] || { echo "ERROR: expected Google Authenticator 0.56, got $ga_version"; exit 1; }
 
 echo "Checking WPS Hide Login..."
-wps_version="$(docker compose exec -T wordpress wp --allow-root plugin get wps-hide-login --field=version | tr -d '')"
+wps_version="$(docker compose exec -T wordpress wp --allow-root plugin get wps-hide-login --field=version | tr -d '
+')"
 [ "$wps_version" = "1.9.19" ] || { echo "ERROR: expected WPS Hide Login 1.9.19, got $wps_version"; exit 1; }
 
 echo "Checking uploads..."
