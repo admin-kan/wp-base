@@ -7,10 +7,21 @@ docker compose config >/dev/null
 set -a
 . ./.env
 set +a
-read -r -p "WordPress admin username: " ADMIN_USER
-read -r -s -p "WordPress admin password: " ADMIN_PASSWORD
-echo
-read -r -p "WordPress admin email: " ADMIN_EMAIL
+if [ -n "${WP_ADMIN_USER:-}" ] && [ -n "${WP_ADMIN_EMAIL:-}" ] && { [ -n "${WP_ADMIN_PASSWORD:-}" ] || [ -n "${WP_ADMIN_PASSWORD_FILE:-}" ]; }; then
+  ADMIN_USER="$WP_ADMIN_USER"
+  ADMIN_EMAIL="$WP_ADMIN_EMAIL"
+  if [ -n "${WP_ADMIN_PASSWORD_FILE:-}" ]; then
+    [ -f "$WP_ADMIN_PASSWORD_FILE" ] || { echo "ERROR: WP_ADMIN_PASSWORD_FILE not found"; exit 1; }
+    IFS= read -r ADMIN_PASSWORD < "$WP_ADMIN_PASSWORD_FILE"
+  else
+    ADMIN_PASSWORD="$WP_ADMIN_PASSWORD"
+  fi
+else
+  read -r -p "WordPress admin username: " ADMIN_USER
+  read -r -s -p "WordPress admin password: " ADMIN_PASSWORD
+  echo
+  read -r -p "WordPress admin email: " ADMIN_EMAIL
+fi
 [ -n "$ADMIN_USER" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$ADMIN_EMAIL" ] || { echo "ERROR: admin values cannot be empty"; exit 1; }
 docker compose up -d
 for i in $(seq 1 60); do
