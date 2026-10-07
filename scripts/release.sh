@@ -43,7 +43,7 @@ read -r -p "Build and push this release? [y/N] " CONFIRM
 [ "$CONFIRM" = y ] || [ "$CONFIRM" = Y ] || exit 0
 
 docker build -f docker/wordpress/Dockerfile -t "$IMAGE" .
-docker run --rm "$IMAGE" wp --allow-root core version >/dev/null
+docker run --rm "$IMAGE" wp --allow-root --path=/usr/src/wordpress core version >/dev/null
 docker push "$IMAGE"
 
 sed -i "s#^WP_IMAGE=.*#WP_IMAGE=$IMAGE#" .env.example
