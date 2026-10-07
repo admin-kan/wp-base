@@ -1,0 +1,7 @@
+.git
+.github
+.env
+backups
+.migration-snapshot
+app/wp-content/uploads
+WP-KAN

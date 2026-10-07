@@ -1,1 +1,7 @@
-./WP-KAN
+.env
+backups/
+.migration-snapshot/
+app/wp-content/uploads/*
+!app/wp-content/uploads/.gitkeep
+*.log
+.DS_Store
