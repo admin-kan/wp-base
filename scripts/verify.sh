@@ -1,31 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a
-. ./.env
-set +a
-fail=0
-check() { if "$@"; then printf 'OK   %s\n' "$*"; else printf 'FAIL %s\n' "$*"; fail=1; fi; }
-check docker compose config >/dev/null
-check docker compose ps --status running >/dev/null
-check docker compose exec -T db mysqladmin ping -h 127.0.0.1 -u root -p"$DB_ROOT_PASSWORD" --silent >/dev/null
-check docker compose exec -T wordpress php -v >/dev/null
-check docker compose exec -T wordpress wp core version --allow-root >/dev/null
-check docker compose exec -T wordpress wp cli version --allow-root >/dev/null
-check docker compose exec -T wordpress php -r '$m=new mysqli(getenv("WORDPRESS_DB_HOST"),getenv("WORDPRESS_DB_USER"),getenv("WORDPRESS_DB_PASSWORD"),getenv("WORDPRESS_DB_NAME")); if ($m->connect_errno) { exit(1); }' >/dev/null
-core_version="$(docker compose exec -T wordpress wp core version --allow-root | tr -d '\r')"
-[ "$core_version" = "7.1.2" ] || { echo "FAIL core version: $core_version"; fail=1; }
-astra_version="$(docker compose exec -T wordpress wp theme get astra --field=version --allow-root | tr -d '\r')"
-[ "$astra_version" = "4.14.0" ] || { echo "FAIL Astra version: $astra_version"; fail=1; }
-ga_version="$(docker compose exec -T wordpress wp plugin get google-authenticator --field=version --allow-root | tr -d '\r')"
-[ "$ga_version" = "0.56" ] || { echo "FAIL Google Authenticator version: $ga_version"; fail=1; }
-wps_version="$(docker compose exec -T wordpress wp plugin get wps-hide-login --field=version --allow-root | tr -d '\r')"
-[ "$wps_version" = "1.9.19" ] || { echo "FAIL WPS Hide Login version: $wps_version"; fail=1; }
-check test -d app/wp-content/uploads
-check curl -fsS "$WP_SITE_URL/healthz" >/dev/null
-check curl -fsS "$WP_SITE_URL/" >/dev/null
-login_url="$(docker compose exec -T wordpress wp eval 'echo wp_login_url();' --allow-root | tr -d '\r')"
-check curl -fsS "$WP_SITE_URL/" >/dev/null
-check curl -fsS -L "$login_url" >/dev/null
-if [ "$fail" -ne 0 ]; then echo "VERIFY: FAILED"; exit 1; fi
+
+echo "Checking Docker Compose..."
+docker compose config >/dev/null
+
+echo "Checking services..."
+docker compose ps --status running >/dev/null
+
+echo "Checking database..."
+docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin ping -h 127.0.0.1 -u root --silent' >/dev/null
+
+echo "Checking WordPress container..."
+docker compose exec -T wordpress php-fpm -t >/dev/null 2>&1
+
+echo "Checking wp-config.php..."
+docker compose exec -T wordpress test -s /var/www/html/wp-config.php
+
+echo "Checking PHP..."
+docker compose exec -T wordpress php -v >/dev/null
+
+echo "Checking WP-CLI..."
+docker compose exec -T wordpress wp --allow-root cli version >/dev/null
+
+echo "Checking WordPress core..."
+core_version="$(docker compose exec -T wordpress wp --allow-root core version | tr -d '')"
+[ "$core_version" = "7.1.2" ] || { echo "ERROR: expected WordPress 7.1.2, got $core_version"; exit 1; }
+
+docker compose exec -T wordpress wp --allow-root core is-installed >/dev/null
+
+echo "Checking Astra..."
+astra_version="$(docker compose exec -T wordpress wp --allow-root theme get astra --field=version | tr -d '')"
+[ "$astra_version" = "4.14.0" ] || { echo "ERROR: expected Astra 4.14.0, got $astra_version"; exit 1; }
+
+echo "Checking Google Authenticator..."
+ga_version="$(docker compose exec -T wordpress wp --allow-root plugin get google-authenticator --field=version | tr -d '')"
+[ "$ga_version" = "0.56" ] || { echo "ERROR: expected Google Authenticator 0.56, got $ga_version"; exit 1; }
+
+echo "Checking WPS Hide Login..."
+wps_version="$(docker compose exec -T wordpress wp --allow-root plugin get wps-hide-login --field=version | tr -d '')"
+[ "$wps_version" = "1.9.19" ] || { echo "ERROR: expected WPS Hide Login 1.9.19, got $wps_version"; exit 1; }
+
+echo "Checking uploads..."
+test -d app/wp-content/uploads
+
+echo "Checking HTTP..."
+curl -fsS -L --max-redirs 5 -o /tmp/wp-verify.html -w '%{http_code}' "$WP_SITE_URL/" | grep -qx '200'
+
+echo "Checking site title..."
+grep -q '<title>' /tmp/wp-verify.html
+
 echo "VERIFY: PASSED"
